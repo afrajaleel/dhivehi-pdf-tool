@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dhivehi PDF Tool</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<style>
+@font-face { font-family: "Noto Sans Thaana"; src: url(/fonts/NotoSansThaana-Regular.ttf); }
+@font-face { font-family: "Noto Sans Thaana"; font-weight: 700; src: url(/fonts/NotoSansThaana-Bold.ttf); }
+
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --ink: #1b2430; --mute: #667085; --line: #dde1e8;
+  --brand: #0f6b5c; --brand-ink: #ffffff; --soft: #e6f2ef; --warn: #8a5300; --warn-bg: #fff4e0; --err: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14181f; --card: #1c222b; --ink: #e8ecf2; --mute: #98a2b3; --line: #2f3845;
+          --brand: #3fb59f; --brand-ink: #062a24; --soft: #1e332f; --warn: #ffc76b; --warn-bg: #33290f; --err: #ff8a80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans Thaana", sans-serif; }
+input, textarea, select, button { font: inherit; color: inherit; }
+textarea, input[type=text], input[type=number], select {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card);
+  font-family: system-ui, "Noto Sans Thaana", sans-serif; }
+textarea { min-height: 84px; resize: vertical; font-size: 17px; }
+label { display: block; font-size: 13px; color: var(--mute); margin: 10px 0 3px; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; margin: 6px 14px 0 0; color: var(--ink); }
+label.inline input { width: auto; }
+h1 { font-size: 19px; margin: 0; }
+.logo { width: 34px; height: 34px; border-radius: 8px; margin-right: -8px; }
+h3 { font-size: 15px; margin: 0 0 6px; }
+.muted { color: var(--mute); font-size: 13px; }
+
+header { background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 18px;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap; position: sticky; top: 0; z-index: 20; }
+nav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+nav button { border: 0; background: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; color: var(--mute); }
+nav button.on { background: var(--soft); color: var(--brand); font-weight: 600; }
+main { max-width: 1240px; margin: 0 auto; padding: 16px 18px 90px; }
+
+.btn { border: 1px solid var(--line); background: var(--card); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+.btn.danger { color: var(--err); }
+.btn:disabled { opacity: .5; cursor: default; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+/* The PDF preview (stagewrap/fillstagewrap) scrolls within its own box so a long document never pushes
+   the toolbar or the tools panel out of view; the tools panel stays pinned alongside it as you scroll. */
+.grid2 > .card { position: sticky; top: calc(var(--headerh, 60px) + 12px);
+  max-height: calc(100vh - var(--headerh, 60px) - 24px); overflow: auto; }
+@media (max-width: 900px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .grid2 > .card { position: static; max-height: none; overflow: visible; }
+}
+.cols4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cols4 label { margin-top: 0; }
+.hidden { display: none !important; }
+
+#pdfbar { margin-bottom: 14px; }
+#stagewrap, #fillstagewrap { overflow: auto; background: #8b93a1; border-radius: 12px; padding: 12px; text-align: center;
+  max-height: calc(100vh - var(--headerh, 60px) - 150px); min-height: 260px; }
+@media (max-width: 900px) { #stagewrap, #fillstagewrap { max-height: 70vh; } }
+#stage { position: relative; display: inline-block; max-width: 100%; touch-action: none; cursor: crosshair;
+  user-select: none; box-shadow: 0 2px 12px rgba(0,0,0,.3); line-height: 0; }
+#pageimg { max-width: 100%; height: auto; display: block; background: #fff; -webkit-user-drag: none; }
+.box { position: absolute; border: 1.5px dashed #2563eb; background: rgba(37,99,235,.08); cursor: move; overflow: hidden;
+  line-height: 1.3; }
+.box.sel { border: 2px solid #ea580c; background: rgba(234,88,12,.10); }
+.box .t { text-align: start; font-family: system-ui, "Noto Sans Thaana", sans-serif; font-size: calc(var(--fs) * var(--k) * 1px);
+  pointer-events: none; white-space: pre-wrap; word-break: break-word; }
+.grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; background: #ea580c; cursor: nwse-resize; opacity: .0; }
+.box.sel .grip { opacity: .9; }
+
+.items { list-style: none; margin: 8px 0 0; padding: 0; max-height: 200px; overflow: auto; }
+.items li { padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.items li.sel { background: var(--soft); }
+.items li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.result { margin-top: 14px; }
+.result iframe { width: 100%; height: 78vh; border: 1px solid var(--line); border-radius: 10px; background: #fff; margin-top: 8px; }
+.note { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 13px; }
+.note.err { color: var(--err); }
+.fieldrow { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.fieldrow:last-child { border-bottom: 0; }
+.fieldrow .nm { font-size: 13px; color: var(--mute); }
+
+.fontpick .fprow { display: flex; gap: 6px; }
+.fontpick .fprow select { flex: 1; }
+.fontpick .sample { margin-top: 4px; font-size: 22px; line-height: 1.5; padding: 4px 8px; border: 1px dashed var(--line); border-radius: 8px; }
+
+
+#fillstage { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+#fillstage img { max-width: 100%; height: auto; display: block; background: #fff; }
+.ffield { position: absolute; }
+.ffield input[type=text], .ffield textarea, .ffield select {
+  width: 100%; height: 100%; border: 1.5px solid #2563eb; background: rgba(255,255,255,0.96); border-radius: 3px;
+  padding: 1px 4px; font: inherit; font-family: system-ui, "Noto Sans Thaana", sans-serif; box-sizing: border-box;
+  /* Fixed, theme-independent colour: this sits on top of the (always light) page image, so it must stay
+     readable regardless of the app's light/dark setting, and opaque enough to fully cover whatever the
+     PDF already drew in that field (its old value, a printed line, etc.) rather than showing through it. */
+  color: #111827 !important; caret-color: #111827; }
+.ffield textarea { resize: none; }
+.ffield input[type=checkbox] { width: 100%; height: 100%; margin: 0; accent-color: #2563eb; }
+.ffield.on input, .ffield.on select { outline: 2px solid #ea580c; outline-offset: 1px; }
+.ffield.broken input, .ffield.broken select { border: 1.5px dashed #dc2626; background: rgba(255,241,241,0.97); min-width: 22px; min-height: 22px; }
+.fbadge { position: absolute; left: 0; top: -18px; font: 600 10px system-ui; padding: 1px 5px; border-radius: 4px 4px 0 0; white-space: nowrap; pointer-events: none; }
+.fbadge.warn { background: #dc2626; color: #fff; }
+.fbadge.shared { background: #ea580c; color: #fff; left: auto; right: 0; border-radius: 4px 0 4px 0; }
+.fixbtn { position: absolute; top: -18px; left: 50%; transform: translate(-50%,-100%); background: #111827; color: #fff;
+  font: 600 10px system-ui; padding: 3px 7px; border-radius: 6px; white-space: nowrap; cursor: pointer; border: 0; display: none; }
+.ffield.broken:hover .fixbtn, .ffield.broken.on .fixbtn { display: block; }
+.fbanner { background: var(--warn-bg); color: var(--ink); border-left: 4px solid var(--warn); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; }
+.flist { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+.flist li { padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.flist li:hover { background: var(--bg); }
+.flist li.on { background: var(--soft); }
+.flist .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.flist .tag { font-size: 10.5px; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+.flist .tag.warn { background: #dc2626; color: #fff; }
+.flist .tag.shared { background: #ea580c; color: #fff; }
+.flist .tag.pg { background: var(--bg); color: var(--mute); border: 1px solid var(--line); }
+.toolbar { gap: 8px; }
+.box { overflow: visible; }
+.popwrap { position: relative; }
+.pop { position: absolute; top: 100%; left: 0; z-index: 25; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.25); padding: 6px; display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 4px; min-width: 290px; }
+.pop button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 10px; cursor: pointer; text-align: left; font-weight: 700; }
+.pop button:hover { background: var(--soft); }
+.box .c { position: absolute; inset: 0; overflow: hidden; }
+.box.stamp .c, .box.image .c { overflow: visible; }
+.box.image { border-color: #7c3aed; background: rgba(124,58,237,.06); }
+.box.stamp { border-color: #0891b2; background: rgba(8,145,178,.05); }
+.box.sel { border-color: #ea580c !important; }
+.box .c img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block; }
+.box .stampv { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-style: solid; text-align: center; font-weight: 700; line-height: 1.1; pointer-events: none; overflow: hidden; }
+.badge { position: absolute; left: 0; top: -17px; background: #ea580c; color: #fff; font: 600 11px system-ui; line-height: 1; padding: 3px 6px;
+  border-radius: 5px 5px 0 0; pointer-events: none; white-space: nowrap; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 12px; }
+#sigpad { width: 100%; height: auto; aspect-ratio: 3 / 1; border: 1px dashed var(--mute); border-radius: 10px; touch-action: none; cursor: crosshair;
+  background: repeating-linear-gradient(0deg, transparent 0 calc(66% - 1px), rgba(128,128,128,.35) calc(66% - 1px) 66%, transparent 66%), #fff; }
+.checker { background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 16px 16px; border-radius: 10px; min-height: 90px; display: flex; align-items: center; justify-content: center; padding: 8px; margin-top: 8px; }
+.checker img { max-width: 100%; max-height: 160px; }
+.ink { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.ink.on { outline: 2px solid var(--brand); outline-offset: 2px; }
+.btn.tab.on { background: var(--soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.thumb { position: relative; border: 1px solid var(--line); border-radius: 8px; padding: 4px; cursor: pointer;
+  background: repeating-conic-gradient(#e8e8e8 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
+.thumb img { height: 42px; display: block; }
+.thumb button { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-size: 11px; line-height: 1; padding: 0; }
+.pop .wide { grid-column: 1 / -1; font-weight: 600; }
+.pop .pl { grid-column: 1 / -1; }
+.pop .thumbs { grid-column: 1 / -1; margin: 2px 0 0; }
+.note.ok { background: var(--soft); color: var(--brand); }
+label.radio { display: block; margin: 8px 0; color: var(--ink); font-size: 15px; }
+label.radio input { width: auto; margin-right: 8px; }
+
+.subnav { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.subnav .spacer { flex: 1; }
+details.sec { border: 1px solid var(--line); border-radius: 10px; background: var(--card); margin-bottom: 10px; }
+details.sec > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; font-size: 15.5px; list-style-position: inside; }
+details.sec[open] > summary { border-bottom: 1px solid var(--line); }
+details.sec .body { padding: 6px 18px 16px; }
+.body h4 { margin: 14px 0 4px; font-size: 14px; color: var(--brand); }
+.body p, .body li { line-height: 1.6; }
+.body ul, .body ol { margin: 6px 0 6px 0; padding-left: 22px; }
+.body .tipbox { background: var(--soft); border-radius: 8px; padding: 9px 13px; margin: 10px 0; }
+.body .warnbox { background: var(--warn-bg); color: var(--ink); border-left: 4px solid var(--warn); border-radius: 8px; padding: 9px 13px; margin: 10px 0; }
+.body table { border-collapse: collapse; margin: 8px 0; width: 100%; font-size: 14px; }
+.body th, .body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.body th { background: var(--bg); }
+.pill { display: inline-block; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 0 7px; font-size: 13px; white-space: nowrap; }
+.aboutcard { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.aboutcard img { width: 84px; height: 84px; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+.aboutcard h2 { margin: 0; font-size: 22px; }
+.contact dt { color: var(--mute); font-size: 12.5px; margin-top: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.contact dd { margin: 2px 0 0; font-size: 16px; }
+.contact a { color: var(--brand); }
+#kbd { position: fixed; right: 14px; bottom: 14px; width: min(460px, calc(100vw - 28px)); z-index: 30;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 30px rgba(0,0,0,.25); padding: 8px; }
+#kbd .keys { display: flex; flex-wrap: wrap; gap: 4px; direction: rtl; }
+#kbd button { min-width: 34px; height: 38px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px;
+  font: 20px "Noto Sans Thaana", sans-serif; cursor: pointer; padding: 0 6px; }
+#kbd button:hover { background: var(--soft); }
+#kbd .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+#kbd .sec { margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/icon.png" alt="" class="logo"><h1>Dhivehi PDF Tool</h1>
+  <nav>
+    <button data-tab="overlay" class="on">Edit PDF</button>
+    <button data-tab="fill">Fill a form</button>
+    <button data-tab="gen">New from template</button>
+    <button data-tab="compress">Compress</button>
+    <button data-tab="help">Help &amp; About</button>
+  </nav>
+  <button class="btn" id="kbdToggle" title="Insert Thaana letters into the box you are typing in">ދ Thaana keyboard</button>
+</header>
+
+<main>
+  <!-- shared PDF picker for overlay + fill -->
+  <div id="pdfbar" class="card row">
+    <input type="file" id="file" accept="application/pdf" style="max-width:340px">
+    <span id="fileinfo" class="muted">Choose a PDF to work on.</span>
+  </div>
+
+  <!-- ============ EDIT PDF ============ -->
+  <section id="tab-overlay">
+    <div class="grid2">
+      <div>
+        <div class="row toolbar" style="margin-bottom:6px">
+          <button class="btn" id="prev">◀</button>
+          <span id="pageinfo" class="muted">—</span>
+          <button class="btn" id="next">▶</button>
+          <span class="muted" style="margin-left:10px">Add:</span>
+          <button class="btn" id="addSig">✍ Signature</button>
+          <div class="popwrap"><button class="btn" id="addStamp">▣ Stamp ▾</button><div id="stampPop" class="pop hidden"></div></div>
+        </div>
+        <div class="muted" style="margin-bottom:8px">For text, drag a box on the page (or just click). Drag anything to move it; drag the orange corner to resize.</div>
+        <div id="stagewrap">
+          <div id="stage"><img id="pageimg" alt=""></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Selected item</h3>
+        <div id="editor" class="hidden">
+          <div data-k="text stamp">
+            <label>Text</label>
+            <textarea id="e-text" dir="auto" placeholder="Type or paste Dhivehi / English…"></textarea>
+            <div class="fontpick" id="fp-overlay"></div>
+          </div>
+          <div data-k="image" class="muted">Picture. Drag the corner to resize; proportions are kept.</div>
+          <div class="cols4">
+            <div data-k="text"><label>Size (pt)</label><input type="number" id="e-size" min="4" max="200" step="0.5"></div>
+            <div data-k="text stamp"><label>Colour</label><input type="color" id="e-color" style="width:100%;height:36px;padding:2px"></div>
+            <div data-k="text" style="grid-column: span 2"><label>Align</label>
+              <select id="e-align"><option value="auto">Auto (right for Dhivehi)</option><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select></div>
+            <div data-k="stamp image" style="grid-column: span 2"><label>Tilt: <span id="e-angleV">0</span>°</label><input type="range" id="e-angle" min="-45" max="45" step="1" style="width:100%"></div>
+          </div>
+          <div data-k="text">
+            <label class="inline"><input type="checkbox" id="e-bold"> Bold</label>
+            <label class="inline"><input type="checkbox" id="e-shrink"> Shrink to fit</label>
+          </div>
+          <div data-k="stamp">
+            <label class="inline"><input type="checkbox" id="e-border"> Border</label>
+            <label class="inline"><input type="checkbox" id="e-dateOn"> Add date line</label>
+            <input type="text" id="e-dateText" dir="auto" placeholder="19 Sep 2026" style="margin-top:6px">
+          </div>
+          <div class="cols4" style="margin-top:8px">
+            <div><label>X</label><input type="number" id="e-x" step="1"></div>
+            <div><label>Y</label><input type="number" id="e-y" step="1"></div>
+            <div><label>Width</label><input type="number" id="e-w" step="1"></div>
+            <div><label>Height</label><input type="number" id="e-h" step="1"></div>
+          </div>
+          <div class="muted" style="margin-top:4px">Positions are in points (72 = 1 inch) from the top-left corner.<span data-k="text"> Dhivehi looks smaller than English at the same size; 16–18 pt matches 12 pt English.</span></div>
+          <label>Put it on</label>
+          <select id="e-pages"><option value="this">This page only</option><option value="all">All pages</option><option value="first">First page</option><option value="last">Last page</option><option value="custom">Custom pages…</option></select>
+          <input type="text" id="e-pagesCustom" class="hidden" placeholder="e.g. 1-3, 5" style="margin-top:6px">
+          <div class="row" style="margin-top:10px"><button class="btn danger" id="e-del">Delete</button></div>
+        </div>
+        <div id="noSel" class="muted">Draw a text box on the page, or add a signature or stamp.</div>
+
+        <h3 style="margin-top:16px">Everything on this PDF</h3>
+        <ul class="items" id="itemlist"></ul>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="build-ov" disabled>Build PDF</button>
+        </div>
+      </div>
+    </div>
+    <div id="ov-result" class="result"></div>
+  </section>
+
+  <!-- ============ FILL ============ -->
+  <section id="tab-fill" class="hidden">
+    <div id="fillmsg" class="muted card" style="margin-bottom:14px">Choose a PDF above.</div>
+    <div id="fillopts" class="hidden">
+      <div id="fillBanner" class="fbanner hidden"></div>
+      <div class="grid2">
+        <div>
+          <div class="row" style="margin-bottom:8px">
+            <button class="btn" id="fprev">◀</button>
+            <span id="fpageinfo" class="muted">—</span>
+            <button class="btn" id="fnext">▶</button>
+            <span class="muted">Click a field on the page and type. Fields outlined in red are too small or oddly placed in this PDF — see the tip on them.</span>
+          </div>
+          <div id="fillstagewrap">
+            <div id="fillstage"><img id="fillpageimg" alt=""></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Fields on this PDF</h3>
+          <ul class="flist" id="flist"></ul>
+          <div class="fontpick" id="fp-fill" style="margin-top:12px"></div>
+          <label class="inline" style="margin-top:12px"><input type="checkbox" id="flatten"> Flatten (make every field non-editable)</label>
+          <label class="inline">Font size for Dhivehi fields <input type="number" id="fill-fs" placeholder="auto" style="width:80px" min="4" max="60"></label>
+          <div class="muted" style="margin-top:6px">A field that receives Dhivehi text is drawn as shaped text and stops being an editable field: PDF form fields cannot display Thaana correctly on their own. Fields filled with English / numbers / ticks stay editable.</div>
+          <div class="row" style="margin-top:12px"><button class="btn primary" id="build-fill">Fill PDF</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="fill-result" class="result"></div>
+  </section>
+
+  <!-- ============ TEMPLATES ============ -->
+  <section id="tab-gen" class="hidden">
+    <div class="card">
+      <label style="margin-top:0">Template</label>
+      <select id="tplsel" style="max-width:360px"></select>
+      <div class="fontpick" id="fp-gen" style="max-width:420px"></div>
+      <div id="tplform"></div>
+      <label class="inline" style="margin-top:12px"><input type="checkbox" id="pagenums" checked> Page numbers</label>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="build-gen">Generate PDF</button></div>
+    </div>
+    <div id="gen-result" class="result"></div>
+  </section>
+  <!-- ============ COMPRESS ============ -->
+  <section id="tab-compress" class="hidden">
+    <div class="card">
+      <div id="cmpmsg" class="muted">Choose a PDF above.</div>
+      <div id="cmpopts" class="hidden">
+        <h3 style="margin-top:12px">How much smaller?</h3>
+        <label class="radio"><input type="radio" name="lvl" value="light"><b>Light</b> — hardly any visible change, modest savings</label>
+        <label class="radio"><input type="radio" name="lvl" value="balanced" checked><b>Balanced</b> — good for email and uploads (recommended)</label>
+        <label class="radio"><input type="radio" name="lvl" value="strong"><b>Strong</b> — smallest file; images get softer</label>
+        <label class="radio"><input type="radio" name="lvl" value="target"><b>Target a file size</b> — you choose the size, the tool finds a setting that fits</label>
+        <div id="cmp-targetrow" class="row hidden" style="margin:4px 0 4px 26px">
+          <span>Get it under</span>
+          <input type="number" id="cmp-targetnum" min="0.01" step="0.1" value="2" style="width:90px">
+          <select id="cmp-targetunit" style="width:80px"><option value="MB" selected>MB</option><option value="KB">KB</option></select>
+        </div>
+        <label class="inline"><input type="checkbox" id="cmp-gray"> Convert images to greyscale</label>
+        <label class="inline"><input type="checkbox" id="cmp-meta"> Remove metadata (title, author, …)</label>
+        <div class="muted" style="margin-top:8px">Scans and photo-heavy PDFs shrink the most. A PDF that is mostly text is already small and may barely change. If compressing can't make the file smaller, you get the original back unchanged. A very small target may not be reachable without the pictures becoming unusably soft — the tool tells you the smallest it could manage.</div>
+        <div class="row" style="margin-top:12px"><button class="btn primary" id="build-cmp">Compress</button></div>
+      </div>
+    </div>
+    <div id="cmp-result" class="result"></div>
+  </section>
+  <!-- ============ HELP & ABOUT ============ -->
+  <section id="tab-help" class="hidden">
+    <div class="subnav">
+      <button class="btn tab on" data-help="help">Help</button>
+      <button class="btn tab" data-help="about">About</button>
+      <span class="spacer"></span>
+      <button class="btn" id="helpOpenAll">Open all</button>
+      <button class="btn" id="helpCloseAll">Close all</button>
+    </div>
+
+    <div id="help-help">
+      <details class="sec" open><summary>Quick start</summary><div class="body">
+        <ol>
+          <li><b>Open your PDF</b> with the file box at the top of the page. <i>Edit PDF</i>, <i>Fill a form</i> and <i>Compress</i> all work on the PDF you open there. (<i>New from template</i> does not need one.)</li>
+          <li><b>Pick a tab</b> for what you want to do.</li>
+          <li><b>Make your changes.</b> Nothing is saved to your original file.</li>
+          <li>Press <span class="pill">Build PDF</span> / <span class="pill">Fill PDF</span> / <span class="pill">Generate PDF</span> / <span class="pill">Compress</span>. A preview of the result appears below the button.</li>
+          <li>Press <span class="pill">Download</span> to save it. In the Windows app a Save box asks where to put it.</li>
+        </ol>
+        <div class="tipbox">Not happy with the result? Change something and press the build button again. Your original PDF is never altered, so you can repeat as often as you like.</div>
+        <div class="tipbox">Want to do more to that same result — for example fill a form, then add a stamp? See "Combining tools on one result" below.</div>
+        <h4>The four tools at a glance</h4>
+        <table>
+          <tr><th>Tab</th><th>Use it to</th></tr>
+          <tr><td>Edit PDF</td><td>Type Dhivehi or English anywhere on a PDF, add a signature, add stamps (ready-made, custom text, or your own picture).</td></tr>
+          <tr><td>Fill a form</td><td>Fill in PDF forms that have fillable fields, including with Dhivehi.</td></tr>
+          <tr><td>New from template</td><td>Create a new PDF (for example an official letter) from a template.</td></tr>
+          <tr><td>Compress</td><td>Make a PDF smaller so it is easier to email or upload.</td></tr>
+        </table>
+      </div></details>
+
+      <details class="sec"><summary>Combining tools on one result</summary><div class="body">
+        <p>Every result — a filled form, an edited PDF, a generated letter, a compressed file — has a <span class="pill">✎ Continue editing this PDF →</span> button next to its Download button. Pressing it opens that exact result as the PDF you are working on and switches to <i>Edit PDF</i>, so you can carry straight on instead of saving a file and opening it again.</p>
+        <p>This is how you combine tools that live on different tabs, for example:</p>
+        <ul>
+          <li>Fill a form, then press <span class="pill">✎ Continue editing this PDF →</span> to add a signature or a stamp to the filled form.</li>
+          <li>Generate a letter from a template, then continue editing it to sign it.</li>
+          <li>Edit or sign a PDF, then continue editing again to add a date stamp, or switch to <i>Compress</i> to shrink the final result.</li>
+        </ul>
+        <div class="tipbox">Compress last. If you add more text, a stamp or a signature after compressing, run Compress again afterwards — new additions are not covered by an earlier compress.</div>
+        <p>Your original uploaded PDF is never changed by any of this. Each press of the button works on a fresh copy, so if a chain of edits goes wrong you can always start over by opening the original file again at the top of the page.</p>
+      </div></details>
+
+      <details class="sec"><summary>Edit PDF: adding text</summary><div class="body">
+        <h4>Add a text box</h4>
+        <ul>
+          <li>Use ◀ ▶ to go to the page you want.</li>
+          <li><b>Drag</b> a rectangle on the page where the text should go, or just <b>click</b> once to drop a box of standard size.</li>
+          <li>Type your text in the <i>Text</i> box on the right. Dhivehi and English can be mixed. Press Enter for a new line.</li>
+        </ul>
+        <h4>Move, resize, delete</h4>
+        <ul>
+          <li><b>Move:</b> drag the box.</li>
+          <li><b>Resize:</b> drag the small orange square in its bottom-right corner.</li>
+          <li><b>Delete:</b> select it and press <span class="pill">Delete</span> in the panel on the right.</li>
+          <li>The list <i>Everything on this PDF</i> shows all your items. Click one to select it, even if it is on another page.</li>
+        </ul>
+        <h4>Text settings</h4>
+        <table>
+          <tr><th>Setting</th><th>What it does</th></tr>
+          <tr><td>Font</td><td>The typeface used for Dhivehi (see the Fonts section).</td></tr>
+          <tr><td>Size (pt)</td><td>Font size in points. Dhivehi looks smaller than English at the same number, so use about 16-18 for Dhivehi next to 12 pt English.</td></tr>
+          <tr><td>Colour</td><td>Text colour.</td></tr>
+          <tr><td>Align</td><td><i>Auto</i> puts Dhivehi on the right and English on the left. Or choose Left, Centre or Right.</td></tr>
+          <tr><td>Bold</td><td>Bold text (Dhivehi bold needs a bold version of the font; see Fonts).</td></tr>
+          <tr><td>Shrink to fit</td><td>If the text is too big for the box, it is made smaller so everything shows. Untick it to keep your size exactly (a warning appears if it does not fit).</td></tr>
+          <tr><td>X, Y, Width, Height</td><td>Exact position and size in points from the top-left corner of the page (72 points = 1 inch; an A4 page is about 595 x 842). Handy for fine adjustments.</td></tr>
+          <tr><td>Put it on</td><td>This page only, All pages, First page, Last page, or Custom pages such as <span class="pill">1-3, 5</span>.</td></tr>
+        </table>
+        <div class="tipbox">When you are finished, press <b>Build PDF</b>. Check the preview, then Download.</div>
+      </div></details>
+
+      <details class="sec"><summary>Edit PDF: signatures</summary><div class="body">
+        <ol>
+          <li>Press <span class="pill">✍ Signature</span>.</li>
+          <li><b>Draw</b> with your mouse, finger or pen (choose black, blue or red ink and the thickness; <i>Clear</i> to start again), <b>or</b> open <i>Upload a picture</i> and choose a photo or scan of your signature. Keep <i>Make the white background transparent</i> ticked so that only the ink shows.</li>
+          <li>Leave <i>Keep this signature on this computer</i> ticked if you want it saved for next time. Saved signatures appear at the top of the box; click one to use it, or the small ✕ to forget it.</li>
+          <li>Press <span class="pill">Place on page</span>. The signature appears in the middle of the current page. Drag it into position and drag its corner to resize (proportions are kept). Use <i>Tilt</i> to rotate it slightly.</li>
+        </ol>
+        <div class="tipbox">To sign every page of a document (for example initials), set <i>Put it on</i> to <b>All pages</b>. To add a name or date under the signature, add a normal text box.</div>
+        <div class="warnbox">This adds a <b>picture</b> of your signature to the PDF. It is not a certificate-based digital signature and cannot be verified electronically.</div>
+      </div></details>
+
+      <details class="sec"><summary>Edit PDF: stamps (ready-made, custom, picture)</summary><div class="body">
+        <h4>Ready-made and custom text stamps</h4>
+        <ol>
+          <li>Press <span class="pill">▣ Stamp ▾</span> and choose one (APPROVED, REJECTED, RECEIVED, PAID, CONFIDENTIAL, URGENT, FOR REVIEW, DRAFT, COPY), or <i>Custom text…</i>.</li>
+          <li>The stamp appears in the middle of the page. Drag to move, drag the corner to resize.</li>
+          <li>In the panel on the right you can change the <b>text</b> (Dhivehi works), <b>font</b>, <b>colour</b>, <b>tilt</b>, turn the <b>border</b> on or off, and add a <b>date line</b> (type any date text you like, for example <span class="pill">20 Sep 2026</span>).</li>
+        </ol>
+        <h4>Use your own picture as a stamp (seal, logo, scanned stamp)</h4>
+        <ol>
+          <li>Press <span class="pill">▣ Stamp ▾</span> then <span class="pill">🖼 Import a picture…</span>.</li>
+          <li>Choose a PNG or JPG. Keep <i>Make the white background transparent</i> ticked.</li>
+          <li>Press <span class="pill">Place on page</span>, then move, resize and tilt it. Imported pictures are kept in the Stamp menu for next time (click ✕ on a thumbnail to remove one).</li>
+        </ol>
+        <div class="tipbox">A clear picture on a plain white background works best. If the picture has a coloured or grey background, crop it tightly first, or untick the transparency option.</div>
+        <h4>Add your own stamp names</h4>
+        <p>Open the file <span class="pill">stamps.json</span> (in the app folder) in Notepad and add lines such as <span class="pill">{"name": "Label", "text": "Text on the stamp", "color": "#15803d"}</span>. Dhivehi text is fine. Restart the tool to see the changes.</p>
+        <div class="tipbox">The stamp you see on screen is an approximation. The finished PDF centres and fits the text exactly. Check the preview after pressing Build PDF.</div>
+      </div></details>
+
+      <details class="sec"><summary>Fill a form</summary><div class="body">
+        <ol>
+          <li>Open a PDF that has fillable form fields, then go to <i>Fill a form</i>.</li>
+          <li>The page is shown on the left with every field outlined directly on it. Click a field on the page (or click it in the list on the right) and type. Fields you do not touch stay as they are.</li>
+          <li>Use ◀ ▶ to move between pages; the field list on the right shows every field with its page number, so you can jump to one that is on another page.</li>
+          <li>Choose a <b>Font</b> for Dhivehi entries. Optionally set a font size (leave it blank for automatic).</li>
+          <li>Press <span class="pill">Fill PDF</span>, check the preview and Download.</li>
+        </ol>
+        <div class="tipbox">Need to sign or stamp the filled form too? No need to save it first — press <span class="pill">✎ Continue editing this PDF →</span> next to Download and it opens straight into <i>Edit PDF</i> with everything you just filled in still there.</div>
+        <h4>When a form is not built well</h4>
+        <p>Some PDF forms have fields that are too small to see or click, placed slightly off from the box printed on the page, or the same field name reused in more than one spot. The tool marks these for you so filling them is not guesswork:</p>
+        <ul>
+          <li><b>Outlined in red, "too small in this PDF":</b> the field's clickable area is too tiny to use comfortably (or sits outside the visible page). A <span class="pill">Type here instead →</span> button appears on it — this switches to <i>Edit PDF</i> and drops a normal, resizable text box in the same spot, which you can then position exactly and type into.</li>
+          <li><b>"SAME EVERYWHERE":</b> this field name is used in more than one place in the PDF. Whatever you type goes into all of those places at once, because that is how the form was built — there is no way to give each spot different text through the form field itself. If you need different text in each spot, use <i>Edit PDF</i> for the extra ones instead.</li>
+        </ul>
+        <ul>
+          <li><b>Dhivehi in a field:</b> PDF form fields cannot show Thaana on their own. The tool draws your Dhivehi text as correct, shaped text over the field and removes that field, so that one field can no longer be edited afterwards.</li>
+          <li><b>English, numbers and tick boxes</b> stay as normal editable fields.</li>
+          <li><b>Flatten</b> makes every field non-editable, so the form looks like a printed page.</li>
+        </ul>
+        <div class="tipbox">If the tool says the PDF has no fillable fields at all (this is common with scanned forms), use <b>Edit PDF</b> and type directly onto the page instead.</div>
+      </div></details>
+
+      <details class="sec"><summary>New from template</summary><div class="body">
+        <ol>
+          <li>Open <i>New from template</i> and choose a template (an official letter is included).</li>
+          <li>Choose the <b>Font</b> and fill in the boxes. In the letter, each line of the <i>Body</i> becomes its own paragraph.</li>
+          <li>Tick <i>Page numbers</i> if you want them, then press <span class="pill">Generate PDF</span>. Long text automatically flows onto more pages.</li>
+        </ol>
+        <p>The small label boxes (for example Reference, Date and Subject labels) are pre-filled in Dhivehi and can be changed to anything you like.</p>
+        <h4>Adding your own templates</h4>
+        <ul>
+          <li>Templates live in the <span class="pill">pdf_templates</span> folder next to the app. Copy <span class="pill">letter.html</span> and <span class="pill">letter.json</span> and edit the copies in Notepad. Use <span class="pill">{{ name }}</span> for the parts that change. The form on screen is built from these automatically.</li>
+          <li><span class="pill">&lt;p{{ text|attrs }}&gt;</span> gives a paragraph the right direction and size for Dhivehi or English; <span class="pill">{{ body|paragraphs }}</span> turns multi-line text into paragraphs.</li>
+          <li>The <span class="pill">.json</span> file sets the field names, labels, defaults, and page margins.</li>
+        </ul>
+        <div class="tipbox">Have a Dhivehi speaker check the default label wording in the letter template before official use.</div>
+        <p>To add a signature or stamp to the letter you just generated, press <span class="pill">✎ Continue editing this PDF →</span> next to Download — it opens the generated letter straight into <i>Edit PDF</i>.</p>
+      </div></details>
+
+      <details class="sec"><summary>Compress</summary><div class="body">
+        <ol>
+          <li>Open a PDF, go to <i>Compress</i>. The current file size is shown.</li>
+          <li>Choose how much smaller:
+            <ul>
+              <li><b>Light:</b> hardly any visible change, modest savings.</li>
+              <li><b>Balanced:</b> good for email and uploads (recommended).</li>
+              <li><b>Strong:</b> smallest file; pictures become softer.</li>
+            </ul>
+          </li>
+          <li>Optional: <i>Convert images to greyscale</i> (saves more space) and <i>Remove metadata</i> (title, author and similar hidden information).</li>
+          <li>Press <span class="pill">Compress</span>. The result shows the size before and after.</li>
+        </ol>
+        <div class="tipbox">Scans and photo-heavy PDFs shrink the most. A PDF that is mostly text is already small and may barely change. If compressing cannot make the file smaller, you get the original back unchanged.</div>
+        <p>To compress a PDF you have just edited, filled in, or generated, there is no need to download and re-open it first: build that result, then press <span class="pill">✎ Continue editing this PDF →</span> next to its Download button, then switch to <i>Compress</i>. Do this last, after signing or stamping — compressing first and then adding more on top can undo some of the size saving.</p>
+      </div></details>
+
+      <details class="sec"><summary>Fonts</summary><div class="body">
+        <ul>
+          <li>Every tool has a <b>Font</b> menu with a sample line in the chosen font, so you can see the look before using it.</li>
+          <li>The menu lists the built-in <b>Noto Sans Thaana</b>, any font you have added, and Thaana fonts already installed on your computer (on Windows, for example, Faruma or MV Boli).</li>
+          <li>In <i>Edit PDF</i> each text box and stamp can have its own font. In <i>Fill a form</i> and <i>New from template</i> one font is used for the whole result.</li>
+          <li><b>Add a new font:</b> press <span class="pill">Add font…</span> and choose a .ttf or .otf file. It must contain Thaana letters, otherwise the tool tells you it cannot be used. Added fonts are kept in the <span class="pill">fonts</span> folder next to the app.</li>
+          <li><b>Bold:</b> works when the font has a bold file beside it (for example <span class="pill">Faruma.ttf</span> with a matching bold file). Otherwise Bold makes no difference for that font.</li>
+          <li><b>Size differs by font:</b> some fonts draw Dhivehi larger or smaller than others at the same point size. In Edit PDF, adjust the size. Letter templates are tuned for Noto Sans Thaana, so other fonts may look a little smaller or larger.</li>
+        </ul>
+      </div></details>
+
+      <details class="sec"><summary>Typing Dhivehi (Thaana keyboard)</summary><div class="body">
+        <ul>
+          <li>If your computer already has a Dhivehi keyboard, just type as normal in any text box.</li>
+          <li>If not, press <span class="pill">ދ Thaana keyboard</span> at the top right. Click in a text box, then tap letters on the on-screen keyboard. The vowel signs (fili) are shown on the letter އ so you can see them; only the sign itself is inserted.</li>
+          <li>The on-screen keyboard also has the Dhivehi comma, question mark, a space and a new line.</li>
+          <li>Numbers and dates: after Dhivehi text, numbers such as <span class="pill">19 September 2026</span> are kept in the right order automatically.</li>
+        </ul>
+      </div></details>
+
+      <details class="sec"><summary>Saving, privacy and where things are kept</summary><div class="body">
+        <ul>
+          <li><b>Your files stay on your computer.</b> Nothing is sent to the internet.</li>
+          <li>To work on your PDF, the tool keeps a temporary copy in your computer's temp folder. Copies older than about 6 hours are deleted automatically (checked when the app starts and when you open a PDF).</li>
+          <li>Saved signatures and stamp pictures are remembered on <b>this computer only</b>. On another computer, add them again.</li>
+          <li>Your <b>original PDF is never changed</b>. Every result is a new file that you save yourself.</li>
+          <li>Editable extras next to the app: <span class="pill">pdf_templates</span> (templates), <span class="pill">stamps.json</span> (stamp list), <span class="pill">fonts</span> (added fonts).</li>
+        </ul>
+      </div></details>
+
+      <details class="sec"><summary>What this tool does not do</summary><div class="body">
+        <ul>
+          <li>It <b>adds</b> text, signatures and stamps to a PDF. It does not edit or delete the existing text or pictures already in a PDF.</li>
+          <li>It does not create certificate-based digital signatures.</li>
+          <li>It cannot open password-protected PDFs. Remove the password in another program first.</li>
+          <li>It does not read text from scanned pages (no OCR).</li>
+          <li>Very large files (over about 100 MB) cannot be opened.</li>
+        </ul>
+      </div></details>
+
+      <details class="sec"><summary>Troubleshooting</summary><div class="body">
+        <table>
+          <tr><th>Problem</th><th>What to try</th></tr>
+          <tr><td>Dhivehi letters show as empty boxes or look wrong</td><td>Pick a Thaana font from the Font menu. Some other fonts have no Thaana letters at all.</td></tr>
+          <tr><td>Text is smaller than expected</td><td>Turn off <i>Shrink to fit</i>, make the box bigger, or raise the size. Dhivehi usually needs a larger point size than English.</td></tr>
+          <tr><td>"Text does not fit in its box" message</td><td>Make the box bigger, lower the size, or turn on <i>Shrink to fit</i>.</td></tr>
+          <tr><td>Nothing appears in the PDF</td><td>Check the item is on the page you expect and that it has text (empty text boxes are skipped). Press Build PDF again.</td></tr>
+          <tr><td>The stamp looks slightly different on screen than in the PDF</td><td>The on-screen stamp is a quick approximation. The PDF preview after Build PDF is the real result.</td></tr>
+          <tr><td>"This PDF has no fillable form fields"</td><td>Use Edit PDF and type directly onto the page.</td></tr>
+          <tr><td>A form field is too small to click, or in the wrong place</td><td>Use the red "Type here instead" button on it in the Fill a form page — it adds a normal, movable text box in Edit PDF at the same spot.</td></tr>
+          <tr><td>Filling one field also fills another one</td><td>The PDF form reuses the same field name in both places (marked "SAME EVERYWHERE"). Fill it once for the shared value, and use Edit PDF to add separate text for a spot that needs to say something different.</td></tr>
+          <tr><td>"That PDF has expired, please upload again"</td><td>Open the PDF again with the file box at the top.</td></tr>
+          <tr><td>The app does not start, or is very slow</td><td>Make sure the whole folder is on your own computer (Desktop or C:\), not on the office server or a shared drive. Keep DhivehiPDF.exe inside its folder.</td></tr>
+          <tr><td>Windows says "Windows protected your PC"</td><td>Click <i>More info</i>, then <i>Run anyway</i>. If it is blocked, ask IT to allow the DhivehiPDF folder.</td></tr>
+          <tr><td>The app opened in a web browser instead of its own window</td><td>Everything still works the same way there - keep the small message box open while you work, and click OK on it when you finish to close the tool. This almost always means the <b>Microsoft Edge WebView2 Runtime</b> isn't installed on this computer; the message box tells you when that is the reason and links to the installer. Install it, restart DhivehiPDF.exe, and the tool will open in its own window. If the message doesn't mention WebView2, a file called <code>window_error.log</code> appears next to DhivehiPDF.exe with the details - send that to whoever supports the tool.</td></tr>
+        </table>
+      </div></details>
+
+      <details class="sec"><summary>Installing and starting the Windows app</summary><div class="body">
+        <ol>
+          <li>Copy the <b>whole</b> DhivehiPDF folder to your own computer (Desktop or a local drive such as C:\). If it arrived as a zip file, right-click it and choose <i>Extract All</i> first.</li>
+          <li>Open the folder and double-click <b>DhivehiPDF.exe</b>. The first start can take a little while.</li>
+          <li>For an easy shortcut: right-click DhivehiPDF.exe, choose <i>Send to</i>, then <i>Desktop (create shortcut)</i>.</li>
+        </ol>
+        <div class="warnbox"><b>Do not run it from the office server</b> or any shared/network folder. It will not work properly there. Always copy the whole folder to your own computer first.</div>
+      </div></details>
+    </div>
+
+    <div id="help-about" class="hidden">
+      <div class="card">
+        <div class="aboutcard">
+          <img src="/icon.png" alt="">
+          <div>
+            <h2 id="aboutName">Dhivehi PDF Tool</h2>
+            <div style="margin-top:4px">Version <b id="aboutVersion">-</b></div>
+            <div class="muted">Released <span id="aboutReleased">-</span></div>
+          </div>
+        </div>
+        <p style="margin-top:16px">Dhivehi PDF Tool writes Dhivehi (Thaana) correctly on PDFs: right-to-left, with the vowel signs in the right place and mixed Dhivehi, English and numbers in the right order. It can add text, signatures and stamps to a PDF, fill in forms, create letters from templates, and compress PDFs. Everything runs on your own computer.</p>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Contact</h3>
+        <dl class="contact">
+          <dt>Name</dt><dd>Afrah Jaleel</dd>
+          <dt>Position</dt><dd>Team Manager - Admin</dd>
+          <dt>Company</dt><dd>Voyages Maldives PVT LTD</dd>
+          <dt>Email</dt><dd><a href="mailto:afrah.jaleel@voyagesmaldives.com">afrah.jaleel@voyagesmaldives.com</a></dd>
+          <dt>Phone</dt><dd><a href="tel:+9607904850">+960 7904850</a></dd>
+        </dl>
+        <div class="muted" style="margin-top:12px">For help, problems or ideas for improving the tool, please get in touch.</div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Built with</h3>
+        <ul style="margin:6px 0 0">
+          <li>PyMuPDF - PDF engine</li>
+          <li>Flask - local web server</li>
+          <li>pywebview - Windows app window</li>
+          <li>Noto Sans Thaana - Dhivehi font (SIL Open Font License)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Signature dialog -->
+<div id="sigmodal" class="modal hidden">
+  <div class="card" style="width:min(640px,96vw);max-height:94vh;overflow:auto">
+    <div class="row" style="justify-content:space-between"><h3 style="margin:0" id="picTitle">Add a signature</h3><button class="btn" id="sigClose">✕</button></div>
+    <div id="sigSaved" class="thumbs hidden"></div>
+    <div class="row" id="sigTabs" style="margin:10px 0 8px">
+      <button class="btn tab on" data-sigtab="draw">Draw</button>
+      <button class="btn tab" data-sigtab="upload">Upload a picture</button>
+    </div>
+    <div id="sig-draw">
+      <canvas id="sigpad" width="1200" height="400"></canvas>
+      <div class="row" style="margin-top:8px">
+        <span class="muted">Ink</span>
+        <button class="ink on" data-c="#111827" style="background:#111827" title="Black"></button>
+        <button class="ink" data-c="#1d4ed8" style="background:#1d4ed8" title="Blue"></button>
+        <button class="ink" data-c="#b91c1c" style="background:#b91c1c" title="Red"></button>
+        <span class="muted" style="margin-left:8px">Thickness</span><input type="range" id="sigWidth" min="2" max="9" value="4" style="width:110px">
+        <button class="btn" id="sigClear" style="margin-left:auto">Clear</button>
+      </div>
+      <div class="muted" style="margin-top:4px">Sign with your mouse, finger or pen.</div>
+    </div>
+    <div id="sig-upload" class="hidden">
+      <input type="file" id="sigfile" accept="image/png,image/jpeg,image/webp">
+      <label class="inline" style="margin-top:8px"><input type="checkbox" id="sigWhite" checked> Make the white background transparent</label>
+      <div class="checker"><img id="sigPreviewImg" alt=""><span id="sigPreviewHint" class="muted">Choose a photo or scan of your signature</span></div>
+    </div>
+    <label class="inline" style="margin-top:10px"><input type="checkbox" id="sigSave" checked> <span id="sigSaveLabel">Keep this signature on this computer for next time</span></label>
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="sigUse">Place on page</button></div>
+    <div class="muted" style="margin-top:8px" id="sigNote">This puts a picture of your signature on the page. It is not a certificate-based digital signature.</div>
+  </div>
+</div>
+
+<input type="file" id="fontfile" accept=".ttf,.otf" class="hidden">
+
+<!-- Thaana on-screen keyboard -->
+<div id="kbd" class="hidden">
+  <div class="head"><span class="muted">Tap to insert at the cursor</span><button style="font:14px system-ui;min-width:0;height:auto;padding:2px 8px" id="kbdClose">✕</button></div>
+  <div class="keys" id="kLetters"></div>
+  <div class="keys sec" id="kFili"></div>
+  <div class="keys sec" id="kMisc"></div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const state = { pdf: null, page: 0, items: [], sel: -1, fields: [], lastSize: 16, fonts: [], lastFont: null };
+
+/* ---------- keep the sticky side panel / bounded preview height in step with the real header ---------- */
+function syncHeaderHeight() {
+  const h = $('header');
+  if (h) document.documentElement.style.setProperty('--headerh', h.getBoundingClientRect().height + 'px');
+}
+syncHeaderHeight();
+window.addEventListener('resize', syncHeaderHeight);
+new ResizeObserver(syncHeaderHeight).observe($('header'));
+
+/* ---------- tabs ---------- */
+$$('nav button').forEach(b => b.onclick = () => {
+  $$('nav button').forEach(x => x.classList.toggle('on', x === b));
+  ['overlay', 'fill', 'gen', 'compress', 'help'].forEach(t => $('#tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+  $('#pdfbar').classList.toggle('hidden', ['gen', 'help'].includes(b.dataset.tab));
+  if (b.dataset.tab === 'overlay') drawBoxes();
+  if (b.dataset.tab === 'compress') updateCompressUI();
+  // The page image can finish loading while this tab is hidden (e.g. the PDF was uploaded while another
+  // tab was open) - a hidden element reports zero width, so the field boxes never got drawn onto it.
+  // Redraw now that the tab is actually visible and its width can be measured correctly.
+  if (b.dataset.tab === 'fill' && state.fields) renderFieldOverlay();
+});
+
+/* ---------- helpers ---------- */
+async function showPdfResult(resp, host, filename) {
+  host.replaceChildren();
+  if (!resp.ok) {
+    let msg = resp.statusText;
+    try { msg = (await resp.json()).error || msg; } catch (e) {}
+    host.append(Object.assign(document.createElement('div'), { className: 'note err', textContent: msg }));
+    return;
+  }
+  const warns = JSON.parse(resp.headers.get('X-Warnings') || '[]');
+  const blob = await resp.blob(), url = URL.createObjectURL(blob);
+  JSON.parse(resp.headers.get('X-Info') || '[]').forEach(w => host.append(Object.assign(document.createElement('div'), { className: 'note ok', textContent: w })));
+  warns.forEach(w => host.append(Object.assign(document.createElement('div'), { className: 'note', textContent: w })));
+  const row = Object.assign(document.createElement('div'), { className: 'row' });
+  const a = Object.assign(document.createElement('a'), { className: 'btn primary', href: url, download: filename, textContent: '⬇ Download ' + filename, style: 'text-decoration:none' });
+  const desktop = () => window.pywebview && window.pywebview.api;
+  a.onclick = async e => {                                   // desktop app: use a real Save dialog
+    if (!desktop()) return;
+    e.preventDefault();
+    const b64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
+    const saved = await window.pywebview.api.save_pdf(b64, filename);
+    if (saved) a.textContent = '✔ Saved to ' + saved;
+  };
+  row.append(a);
+  const cont = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: '✎ Continue editing this PDF →' });
+  cont.title = 'Open this result in Edit PDF to add a signature, a stamp, or more text - without saving and re-uploading it.';
+  cont.onclick = async () => {
+    cont.disabled = true; cont.textContent = 'Opening…';
+    try {
+      applyUploadedPdf(await uploadBlob(blob, filename));
+      $('nav [data-tab="overlay"]').click();
+      $('#stagewrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      alert(err.message);
+      cont.disabled = false; cont.textContent = '✎ Continue editing this PDF →';
+    }
+  };
+  row.append(cont);
+  host.append(row);
+  if (desktop()) {                                           // desktop app: show pages as images
+    const r = await fetch('/api/preview', { method: 'POST', body: blob });
+    const j = await r.json();
+    const box = Object.assign(document.createElement('div'), { style: 'margin-top:10px;display:grid;gap:10px;justify-items:center;background:#8b93a1;padding:12px;border-radius:10px' });
+    (j.pages || []).forEach(src => box.append(Object.assign(document.createElement('img'), { src, style: 'max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3)' })));
+    if (j.total > (j.pages || []).length) box.append(Object.assign(document.createElement('div'), { className: 'note', textContent: 'Preview shows the first 30 pages; the saved file has all ' + j.total + '.' }));
+    host.append(box);
+  } else {
+    host.append(Object.assign(document.createElement('iframe'), { src: url }));
+  }
+  host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const outName = suffix => (state.pdf.name || 'document.pdf').replace(/\.pdf$/i, '') + '-' + suffix + '.pdf';
+
+/* ---------- upload ---------- */
+function applyUploadedPdf(j) {
+  state.pdf = j; state.page = 0; state.items = []; state.sel = -1;
+  $('#fileinfo').textContent = `${j.name} — ${j.pages.length} page(s), ${j.field_count} form field(s)`;
+  $('#build-ov').disabled = false;
+  $('#ov-result').replaceChildren(); $('#fill-result').replaceChildren(); $('#cmp-result').replaceChildren();
+  showPage(); renderList(); syncEditor(); loadFields(); updateCompressUI();
+}
+async function uploadBlob(blob, filename) {
+  const fd = new FormData(); fd.append('file', blob, filename);
+  const r = await fetch('/api/upload', { method: 'POST', body: fd });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'Could not open that PDF.');
+  return j;
+}
+$('#file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('#fileinfo').textContent = 'Uploading…';
+  try { applyUploadedPdf(await uploadBlob(f, f.name)); }
+  catch (err) { $('#fileinfo').textContent = err.message; }
+};
+
+/* ================= EDIT PDF: text, signature, stamp ================= */
+const stage = $('#stage'), img = $('#pageimg');
+let drag = null;
+
+function showPage() {
+  if (!state.pdf) return;
+  img.src = `/api/page/${state.pdf.id}/${state.page}.png?zoom=1.6`;
+  $('#pageinfo').textContent = `Page ${state.page + 1} / ${state.pdf.pages.length}`;
+}
+img.onload = drawBoxes;
+window.addEventListener('resize', drawBoxes);
+$('#prev').onclick = () => { if (state.pdf && state.page > 0) { state.page--; showPage(); } };
+$('#next').onclick = () => { if (state.pdf && state.page < state.pdf.pages.length - 1) { state.page++; showPage(); } };
+
+const pageDims = () => state.pdf.pages[state.page];
+const kScale = () => img.clientWidth / pageDims().w;      // screen px per PDF point
+
+function placeBox(b, it) {                                 // geometry only (cheap; used while dragging)
+  const pg = pageDims();
+  b.style.left = it.x / pg.w * 100 + '%'; b.style.top = it.y / pg.h * 100 + '%';
+  b.style.width = it.w / pg.w * 100 + '%'; b.style.height = it.h / pg.h * 100 + '%';
+  const bd = b.querySelector('.badge'), p = it.pages || 'this';
+  bd.textContent = p === 'this' ? '' : (['all', 'first', 'last'].includes(p) ? p + ' page' + (p === 'all' ? 's' : '') : 'p. ' + p);
+  bd.style.display = p === 'this' ? 'none' : '';
+}
+function paintBox(b, it) {                                 // content (text / image / stamp look)
+  const k = kScale(), w = it.w * k, h = it.h * k, c = b.querySelector('.c');
+  c.replaceChildren();
+  if (it.kind === 'image') {
+    const im = new Image(); im.src = it.data; im.style.transform = `rotate(${it.angle || 0}deg)`; c.append(im);
+  } else if (it.kind === 'stamp') {
+    const lines = String(it.text || '').split('\n'), longest = Math.max(1, ...lines.map(l => l.length));
+    const fs = Math.max(6, Math.min(h * (it.dateOn ? 0.34 : 0.5) / lines.length * (lines.length > 1 ? 1.4 : 1), (w * 0.8) / (longest * 0.6)));
+    const s = document.createElement('div'); s.className = 'stampv';
+    const bw = it.border ? Math.max(1, Math.min(w, h) * 0.045) : 0;
+    Object.assign(s.style, { borderColor: it.color, color: it.color, borderWidth: bw + 'px', borderRadius: it.border ? Math.min(w, h) * 0.18 + 'px' : '0',
+      transform: `rotate(${it.angle || 0}deg)`, fontFamily: fontCss(it.font) });
+    const t = document.createElement('div'); t.dir = 'auto'; t.textContent = it.text; t.style.fontSize = fs + 'px'; s.append(t);
+    if (it.dateOn && it.dateText) { const d = document.createElement('div'); d.dir = 'auto'; d.textContent = it.dateText; d.style.fontSize = fs * 0.42 + 'px'; d.style.fontWeight = '400'; s.append(d); }
+    c.append(s);
+  } else {
+    const t = document.createElement('div'); t.className = 't'; t.dir = 'auto'; t.textContent = it.text;
+    Object.assign(t.style, { fontSize: it.size * k + 'px', color: it.color, textAlign: it.align === 'auto' ? '' : it.align,
+      fontWeight: it.bold ? '700' : '400', fontFamily: fontCss(it.font) });
+    c.append(t);
+  }
+}
+function drawBoxes() {
+  if (!state.pdf || !img.clientWidth) return;
+  stage.style.setProperty('--k', kScale());
+  $$('.box', stage).forEach(b => b.remove());
+  state.items.forEach((it, i) => {
+    if (it.page !== state.page) return;
+    const b = document.createElement('div');
+    b.className = 'box ' + it.kind + (i === state.sel ? ' sel' : '');
+    b.dataset.i = i;
+    b.innerHTML = '<div class="c"></div><div class="badge"></div><div class="grip"></div>';
+    placeBox(b, it); paintBox(b, it); stage.append(b);
+  });
+}
+const boxEl = i => stage.querySelector(`.box[data-i="${i}"]`);
+
+function pointerPt(e) {
+  const r = img.getBoundingClientRect(), k = r.width / pageDims().w;
+  return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k };
+}
+stage.addEventListener('pointerdown', e => {
+  if (!state.pdf) return;
+  const box = e.target.closest('.box'), pt = pointerPt(e);
+  if (box) {
+    const i = +box.dataset.i; select(i, false);
+    drag = { mode: e.target.classList.contains('grip') ? 'resize' : 'move', i, start: pt, orig: { ...state.items[i] } };
+  } else {
+    const it = { kind: 'text', page: state.page, pages: 'this', x: pt.x, y: pt.y, w: 0, h: 0, text: '', size: state.lastSize, color: '#000000',
+      align: 'auto', bold: false, shrink: true, font: state.lastFont };
+    state.items.push(it); const i = state.items.length - 1;
+    select(i, false);
+    drag = { mode: 'resize', i, start: pt, orig: { ...it }, fresh: true };
+  }
+  stage.setPointerCapture(e.pointerId); e.preventDefault();
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const pt = pointerPt(e), it = state.items[drag.i], dx = pt.x - drag.start.x, dy = pt.y - drag.start.y;
+  if (drag.mode === 'move') { it.x = drag.orig.x + dx; it.y = drag.orig.y + dy; }
+  else if (it.kind === 'image') { it.w = Math.max(12, drag.orig.w + dx); it.h = it.w * (drag.orig.h / drag.orig.w); }
+  else { it.w = Math.max(0, drag.orig.w + dx); it.h = Math.max(0, drag.orig.h + dy); }
+  const b = boxEl(drag.i); if (b) { placeBox(b, it); if (drag.mode === 'resize' && it.kind !== 'image') paintBox(b, it); }
+  syncEditor(true);
+});
+stage.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const it = state.items[drag.i];
+  if (drag.fresh && (it.w < 15 || it.h < 10)) { it.w = 200; it.h = 32; }   // a plain click drops a default-size box
+  if (it.kind !== 'image') { if (it.w < 20) it.w = 20; if (it.h < 12) it.h = 12; }
+  const wasFresh = drag.fresh; drag = null;
+  drawBoxes(); syncEditor(); renderList();
+  if (wasFresh) $('#e-text').focus();
+});
+
+function select(i, redraw = true) {
+  state.sel = i;
+  if (redraw) drawBoxes(); else $$('.box', stage).forEach(b => b.classList.toggle('sel', +b.dataset.i === i));
+  if (state.items[i] && state.items[i].page !== state.page) { state.page = state.items[i].page; showPage(); }
+  syncEditor(); renderList();
+}
+
+const E = { text: $('#e-text'), size: $('#e-size'), color: $('#e-color'), align: $('#e-align'), bold: $('#e-bold'), shrink: $('#e-shrink'),
+            font: null, angle: $('#e-angle'), border: $('#e-border'), dateOn: $('#e-dateOn'), dateText: $('#e-dateText'),
+            pages: $('#e-pages'), pagesCustom: $('#e-pagesCustom'), x: $('#e-x'), y: $('#e-y'), w: $('#e-w'), h: $('#e-h') };
+const STD_PAGES = ['this', 'all', 'first', 'last'];
+function syncEditor(onlyGeometry = false) {
+  const it = state.items[state.sel];
+  $('#editor').classList.toggle('hidden', !it); $('#noSel').classList.toggle('hidden', !!it);
+  if (!it) return;
+  $$('#editor [data-k]').forEach(n => n.classList.toggle('hidden', !n.dataset.k.split(' ').includes(it.kind)));
+  for (const k of ['x', 'y', 'w', 'h']) E[k].value = Math.round(it[k] * 10) / 10;
+  if (onlyGeometry) return;
+  E.text.value = it.text || ''; E.size.value = it.size || 12; E.color.value = it.color || '#000000'; E.align.value = it.align || 'auto';
+  E.bold.checked = !!it.bold; E.shrink.checked = it.shrink !== false;
+  E.angle.value = it.angle || 0; $('#e-angleV').textContent = it.angle || 0;
+  E.border.checked = it.border !== false; E.dateOn.checked = !!it.dateOn; E.dateText.value = it.dateText || '';
+  const p = it.pages || 'this';
+  E.pages.value = STD_PAGES.includes(p) ? p : 'custom'; E.pagesCustom.value = STD_PAGES.includes(p) ? '' : p;
+  E.pagesCustom.classList.toggle('hidden', E.pages.value !== 'custom');
+  if (it.kind !== 'image') { E.font.value = it.font || state.lastFont || ''; E.font.dispatchEvent(new Event('sample')); }
+}
+function bindEditor() {
+  const upd = ev => {
+    const it = state.items[state.sel]; if (!it) return;
+    const ratio = it.h / it.w;
+    if (it.kind !== 'image') { it.text = E.text.value; it.color = E.color.value; it.font = E.font.value || null; state.lastFont = it.font; }
+    if (it.kind === 'text') { it.size = parseFloat(E.size.value) || 12; it.align = E.align.value; it.bold = E.bold.checked; it.shrink = E.shrink.checked; state.lastSize = it.size; }
+    if (it.kind === 'stamp' || it.kind === 'image') { it.angle = +E.angle.value || 0; $('#e-angleV').textContent = it.angle; }
+    if (it.kind === 'stamp') { it.border = E.border.checked; it.dateOn = E.dateOn.checked; it.dateText = E.dateText.value; }
+    for (const k of ['x', 'y', 'w', 'h']) it[k] = parseFloat(E[k].value) || 0;
+    if (it.kind === 'image' && ev && ev.target === E.w) it.h = it.w * ratio;
+    if (it.kind === 'image' && ev && ev.target === E.h) it.w = it.h / ratio;
+    it.pages = E.pages.value === 'custom' ? (E.pagesCustom.value.trim() || 'this') : E.pages.value;
+    E.pagesCustom.classList.toggle('hidden', E.pages.value !== 'custom');
+    const b = boxEl(state.sel); if (b) { placeBox(b, it); paintBox(b, it); }
+    if (it.kind === 'image') syncEditor(true);
+    renderList();
+  };
+  Object.values(E).forEach(x => { x.addEventListener('input', upd); x.addEventListener('change', upd); });
+  $('#e-del').onclick = () => { state.items.splice(state.sel, 1); state.sel = -1; drawBoxes(); syncEditor(); renderList(); };
+}
+
+function renderList() {
+  const ul = $('#itemlist'); ul.replaceChildren();
+  state.items.forEach((it, i) => {
+    const li = document.createElement('li'); if (i === state.sel) li.className = 'sel';
+    const a = document.createElement('span'); a.dir = 'auto';
+    a.textContent = it.kind === 'image' ? '🖼 Picture' : (it.kind === 'stamp' ? '▣ ' : '') + ((it.text || '').trim() || '(empty)');
+    const b = document.createElement('span'); b.className = 'muted'; b.textContent = 'p' + (it.page + 1) + (it.pages && it.pages !== 'this' ? ' ★' : '');
+    li.append(a, b); li.onclick = () => select(i); ul.append(li);
+  });
+}
+
+const centerOf = (w, h) => { const pg = pageDims(); return { x: Math.max(0, (pg.w - w) / 2), y: Math.max(0, (pg.h - h) / 2) }; };
+function addItem(it) { state.items.push(it); select(state.items.length - 1); }
+function needPdf() { if (!state.pdf) { alert('Open a PDF first (top of the page).'); return true; } return false; }
+
+/* ---------- stamps ---------- */
+let stampPresets = [];
+const todayText = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+function addStamp(p) {
+  if (needPdf()) return;
+  const w = 190, h = 58, c = centerOf(w, h);
+  addItem({ kind: 'stamp', page: state.page, pages: 'this', x: c.x, y: c.y, w, h, text: p.text, color: p.color || '#b91c1c', angle: -8,
+    border: true, dateOn: false, dateText: todayText(), font: state.lastFont });
+  $('#stampPop').classList.add('hidden');
+}
+function buildStampPop() {
+  const pop = $('#stampPop'); pop.replaceChildren();
+  [...stampPresets, { name: 'Custom text…', text: 'YOUR TEXT', color: '#b91c1c' }].forEach(p => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = p.name; b.style.color = p.color; b.dir = 'auto';
+    b.onclick = () => addStamp(p); pop.append(b);
+  });
+  const imp = document.createElement('button'); imp.type = 'button'; imp.className = 'wide'; imp.textContent = '🖼 Import a picture (seal, logo, scanned stamp)…';
+  imp.onclick = () => { pop.classList.add('hidden'); openSig('stamp'); }; pop.append(imp);
+  const pics = loadPics('stamp');
+  if (pics.length) {
+    const l = document.createElement('div'); l.className = 'muted pl'; l.textContent = 'Your stamp pictures:'; pop.append(l);
+    const t = document.createElement('div'); t.className = 'thumbs';
+    pics.forEach(url => {
+      const th = document.createElement('div'); th.className = 'thumb'; th.innerHTML = '<img alt=""><button type="button" title="Forget this picture">✕</button>';
+      $('img', th).src = url;
+      th.onclick = () => { pop.classList.add('hidden'); addImageItem(url, 'stamp'); };
+      $('button', th).onclick = ev => { ev.stopPropagation(); storePics('stamp', loadPics('stamp').filter(x => x !== url)); buildStampPop(); };
+      t.append(th);
+    });
+    pop.append(t);
+  }
+}
+$('#addStamp').onclick = async e => {
+  e.stopPropagation();
+  if (!stampPresets.length) stampPresets = (await (await fetch('/api/stamps')).json()).stamps;
+  buildStampPop();
+  $('#stampPop').classList.toggle('hidden');
+};
+document.addEventListener('click', e => { if (!e.target.closest('.popwrap')) $('#stampPop').classList.add('hidden'); });
+
+/* ---------- signatures ---------- */
+const sigPad = $('#sigpad'), sctx = sigPad.getContext('2d');
+const SIG_KEYS = { sig: 'dvpdf.signatures', stamp: 'dvpdf.stampPictures' };
+let picMode = 'sig';                                   // the dialog serves both signatures and imported stamp pictures
+let sigInk = '#111827', sigDrawing = false, sigHasInk = false, sigUploadUrl = null, sigSrcImg = null, sigTab = 'draw';
+
+const loadPics = mode => { try { return JSON.parse(localStorage.getItem(SIG_KEYS[mode]) || '[]'); } catch (e) { return []; } };
+const storePics = (mode, a) => { try { localStorage.setItem(SIG_KEYS[mode], JSON.stringify(a.slice(0, 6))); } catch (e) {} };
+const loadSigs = () => loadPics(picMode), storeSigs = a => storePics(picMode, a);
+function renderSaved() {
+  const host = $('#sigSaved'), a = loadSigs(); host.replaceChildren(); host.classList.toggle('hidden', !a.length);
+  if (a.length) { const l = document.createElement('div'); l.className = 'muted'; l.style.width = '100%'; l.textContent = picMode === 'stamp' ? 'Your saved stamp pictures (click to place):' : 'Your saved signatures (click to place):'; host.append(l); }
+  a.forEach(url => {
+    const t = document.createElement('div'); t.className = 'thumb'; t.innerHTML = '<img alt=""><button type="button" title="Forget this signature">✕</button>';
+    $('img', t).src = url;
+    t.onclick = () => { closeSig(); addImageItem(url, picMode); };
+    $('button', t).onclick = ev => { ev.stopPropagation(); storeSigs(loadSigs().filter(x => x !== url)); renderSaved(); };
+    host.append(t);
+  });
+}
+function openSig(mode = 'sig') {
+  if (needPdf()) return;
+  picMode = mode;
+  const stamp = mode === 'stamp';
+  $('#picTitle').textContent = stamp ? 'Add a stamp picture' : 'Add a signature';
+  $('#sigTabs').classList.toggle('hidden', stamp);
+  $('#sigSaveLabel').textContent = stamp ? 'Keep this picture in my stamp list' : 'Keep this signature on this computer for next time';
+  $('#sigNote').textContent = stamp ? 'Best with a clear picture of your seal or stamp on a plain white background. You can tilt and resize it after placing it.' : 'This puts a picture of your signature on the page. It is not a certificate-based digital signature.';
+  $('#sigPreviewHint').textContent = stamp ? 'Choose a picture of your stamp, seal or logo' : 'Choose a photo or scan of your signature';
+  $$('[data-sigtab]').forEach(x => x.classList.toggle('on', x.dataset.sigtab === (stamp ? 'upload' : 'draw')));
+  sigTab = stamp ? 'upload' : 'draw';
+  $('#sig-draw').classList.toggle('hidden', stamp); $('#sig-upload').classList.toggle('hidden', !stamp);
+  sctx.clearRect(0, 0, sigPad.width, sigPad.height); sigHasInk = false; sigUploadUrl = null; sigSrcImg = null;
+  $('#sigPreviewImg').removeAttribute('src'); $('#sigPreviewHint').classList.remove('hidden'); $('#sigfile').value = '';
+  renderSaved(); $('#sigmodal').classList.remove('hidden');
+}
+const closeSig = () => $('#sigmodal').classList.add('hidden');
+$('#addSig').onclick = () => openSig('sig'); $('#sigClose').onclick = closeSig;
+$('#sigmodal').addEventListener('pointerdown', e => { if (e.target === $('#sigmodal')) closeSig(); });
+$$('[data-sigtab]').forEach(b => b.onclick = () => {
+  sigTab = b.dataset.sigtab; $$('[data-sigtab]').forEach(x => x.classList.toggle('on', x === b));
+  $('#sig-draw').classList.toggle('hidden', sigTab !== 'draw'); $('#sig-upload').classList.toggle('hidden', sigTab !== 'upload');
+});
+$$('.ink').forEach(b => b.onclick = () => { sigInk = b.dataset.c; $$('.ink').forEach(x => x.classList.toggle('on', x === b)); });
+$('#sigClear').onclick = () => { sctx.clearRect(0, 0, sigPad.width, sigPad.height); sigHasInk = false; };
+
+const padPt = e => { const r = sigPad.getBoundingClientRect(); return { x: (e.clientX - r.left) * sigPad.width / r.width, y: (e.clientY - r.top) * sigPad.height / r.height }; };
+sigPad.addEventListener('pointerdown', e => {
+  sigDrawing = true; sigHasInk = true;
+  sctx.strokeStyle = sigInk; sctx.lineWidth = +$('#sigWidth').value * 2; sctx.lineCap = sctx.lineJoin = 'round';
+  const p = padPt(e); sctx.beginPath(); sctx.moveTo(p.x, p.y); sctx.lineTo(p.x + 0.1, p.y); sctx.stroke(); sctx.beginPath(); sctx.moveTo(p.x, p.y);
+  sigPad.setPointerCapture(e.pointerId); e.preventDefault();
+});
+sigPad.addEventListener('pointermove', e => { if (!sigDrawing) return; const p = padPt(e); sctx.lineTo(p.x, p.y); sctx.stroke(); sctx.beginPath(); sctx.moveTo(p.x, p.y); });
+['pointerup', 'pointercancel'].forEach(t => sigPad.addEventListener(t, () => { sigDrawing = false; }));
+
+function trimToDataUrl(src) {                        // crop transparent margins, return PNG data-URL (or null if empty)
+  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return null;
+  const pad = 6; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(src, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+function processUpload() {
+  if (!sigSrcImg) return;
+  const s = Math.min(1, 900 / sigSrcImg.width), c = document.createElement('canvas');
+  c.width = Math.round(sigSrcImg.width * s); c.height = Math.round(sigSrcImg.height * s);
+  const x = c.getContext('2d'); x.drawImage(sigSrcImg, 0, 0, c.width, c.height);
+  if ($('#sigWhite').checked) {
+    const id = x.getImageData(0, 0, c.width, c.height), d = id.data, thr = 205, soft = 35;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      if (lum >= thr) d[i + 3] = 0; else if (lum > thr - soft) d[i + 3] = Math.round(d[i + 3] * (thr - lum) / soft);
+    }
+    x.putImageData(id, 0, 0);
+  }
+  sigUploadUrl = trimToDataUrl(c);
+  if (sigUploadUrl) { $('#sigPreviewImg').src = sigUploadUrl; $('#sigPreviewHint').classList.add('hidden'); }
+  else { $('#sigPreviewImg').removeAttribute('src'); $('#sigPreviewHint').classList.remove('hidden'); $('#sigPreviewHint').textContent = 'Nothing left after removing the background - untick the option.'; }
+}
+$('#sigfile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => { const im = new Image(); im.onload = () => { sigSrcImg = im; processUpload(); }; im.src = fr.result; };
+  fr.readAsDataURL(f);
+};
+$('#sigWhite').onchange = processUpload;
+
+function addImageItem(url, mode = 'sig') {
+  if (needPdf()) return;
+  const im = new Image();
+  im.onload = () => {
+    const pg = pageDims(), w = mode === 'stamp' ? Math.min(120, pg.w * 0.3) : Math.min(160, pg.w * 0.4);
+    const h = w * im.naturalHeight / im.naturalWidth, c = centerOf(w, h);
+    addItem({ kind: 'image', page: state.page, pages: 'this', x: c.x, y: c.y, w, h, angle: 0, data: url });
+  };
+  im.src = url;
+}
+$('#sigUse').onclick = () => {
+  const url = sigTab === 'draw' ? (sigHasInk ? trimToDataUrl(sigPad) : null) : sigUploadUrl;
+  if (!url) { alert(sigTab === 'draw' ? 'Draw your signature first.' : 'Choose a picture first.'); return; }
+  if ($('#sigSave').checked) storeSigs([url, ...loadSigs().filter(x => x !== url)]);
+  closeSig(); addImageItem(url, picMode);
+};
+
+$('#build-ov').onclick = async () => {
+  if (!state.pdf) return;
+  const btn = $('#build-ov'); btn.disabled = true; btn.textContent = 'Building…';
+  try {
+    const items = state.items.map(it => ({ ...it, date_text: it.kind === 'stamp' && it.dateOn ? (it.dateText || '') : '' }));
+    const r = await postJSON(`/api/overlay/${state.pdf.id}`, { items });
+    await showPdfResult(r, $('#ov-result'), outName('edited'));
+  } finally { btn.disabled = false; btn.textContent = 'Build PDF'; }
+};
+
+/* ================= FILL ================= */
+const fillState = { page: 0, values: {}, dirty: new Set(), sel: null, focusAfterRender: null };
+
+function fieldTag(f) {
+  const w = f.rect[2] - f.rect[0], h = f.rect[3] - f.rect[1];
+  const pg = state.pdf.pages[f.page] || { w: 9999, h: 9999 };
+  const tiny = f.type !== 'radio' && (w < 8 || h < 8);
+  const offpage = f.rect[2] <= 0 || f.rect[3] <= 0 || f.rect[0] >= pg.w || f.rect[1] >= pg.h;
+  return { broken: tiny || offpage, shared: !!f.shared };
+}
+function fieldValue(f) {
+  if (fillState.values[f.name] !== undefined) return fillState.values[f.name];
+  return f.type === 'checkbox' ? false : (f.value || '');
+}
+function setFieldValue(f, v) { fillState.values[f.name] = v; fillState.dirty.add(f.name); }
+
+async function loadFields() {
+  $('#fillopts').classList.add('hidden'); $('#fillBanner').classList.add('hidden');
+  fillState.values = {}; fillState.dirty.clear(); fillState.sel = null; fillState.page = 0;
+  if (!state.pdf) { $('#fillmsg').textContent = 'Choose a PDF above.'; return; }
+  if (!state.pdf.field_count) {
+    $('#fillmsg').textContent = 'This PDF has no fillable form fields. Use "Edit PDF" to type onto it instead.';
+    return;
+  }
+  const { fields } = await (await fetch(`/api/fields/${state.pdf.id}`)).json();
+  state.fields = fields;
+  const broken = fields.filter(f => fieldTag(f).broken).length;
+  const shared = fields.filter(f => fieldTag(f).shared).length;
+  $('#fillmsg').textContent = `${fields.length} field(s) found on this PDF.`;
+  const msgs = [];
+  if (broken) msgs.push(`${broken} field${broken > 1 ? 's look' : ' looks'} too small or badly placed in this PDF (outlined in red below). Use "Type here instead" on them.`);
+  if (shared) msgs.push(`${shared} field${shared > 1 ? 's are' : ' is'} used in more than one spot (marked SAME EVERYWHERE) — typing a value fills every one of those spots, because that's how this PDF was built.`);
+  $('#fillBanner').classList.toggle('hidden', !msgs.length); $('#fillBanner').textContent = msgs.join(' ');
+  fillState.page = fields[0].page;
+  showFillPage(); renderFieldList();
+  $('#fillopts').classList.remove('hidden');
+}
+
+function showFillPage() {
+  if (!state.pdf) return;
+  $('#fillpageimg').src = `/api/page/${state.pdf.id}/${fillState.page}.png?zoom=1.6`;
+  $('#fpageinfo').textContent = `Page ${fillState.page + 1} / ${state.pdf.pages.length}`;
+}
+$('#fprev').onclick = () => { if (fillState.page > 0) { fillState.page--; showFillPage(); } };
+$('#fnext').onclick = () => { if (state.pdf && fillState.page < state.pdf.pages.length - 1) { fillState.page++; showFillPage(); } };
+$('#fillpageimg').onload = renderFieldOverlay;
+$('#fillstagewrap').addEventListener('scroll', () => {});
+window.addEventListener('resize', renderFieldOverlay);
+
+function fieldsOnPage(p) { return (state.fields || []).filter(f => f.page === p); }
+
+function renderFieldOverlay() {
+  const img = $('#fillpageimg'), stage = $('#fillstage');
+  if (!state.pdf || !img.clientWidth) return;
+  $$('.ffield', stage).forEach(n => n.remove());
+  const pg = state.pdf.pages[fillState.page], k = img.clientWidth / pg.w;
+  fieldsOnPage(fillState.page).forEach(f => {
+    const tag = fieldTag(f);
+    const box = document.createElement('div'); box.className = 'ffield' + (tag.broken ? ' broken' : '') + (fillState.sel === f.name ? ' on' : '');
+    const [x0, y0, x1, y1] = f.rect;
+    let w = (x1 - x0) * k, h = (y1 - y0) * k;
+    if (tag.broken) { w = Math.max(w, 22); h = Math.max(h, 22); }
+    Object.assign(box.style, { left: x0 * k + 'px', top: y0 * k + 'px', width: w + 'px', height: h + 'px' });
+    box.dataset.name = f.name;
+
+    let inp;
+    if (f.type === 'text') {
+      inp = f.multiline ? document.createElement('textarea') : document.createElement('input');
+      if (!f.multiline) inp.type = 'text';
+      inp.dir = 'auto'; inp.value = fieldValue(f);
+      inp.title = f.name;
+      inp.addEventListener('input', () => setFieldValue(f, inp.value));
+    } else if (f.type === 'checkbox') {
+      inp = document.createElement('input'); inp.type = 'checkbox'; inp.checked = !!fieldValue(f); inp.title = f.name;
+      inp.addEventListener('change', () => setFieldValue(f, inp.checked));
+    } else {
+      inp = document.createElement('select'); inp.title = f.name;
+      inp.append(new Option('— leave as is —', ''));
+      f.options.forEach(o => inp.append(new Option(o, o)));
+      inp.value = fieldValue(f);
+      inp.addEventListener('change', () => setFieldValue(f, inp.value));
+    }
+    inp.addEventListener('focus', () => handleFieldFocus(f.name));
+    box.append(inp);
+
+    if (tag.shared) { const b = document.createElement('div'); b.className = 'fbadge shared'; b.textContent = 'SAME EVERYWHERE'; box.append(b); }
+    if (tag.broken) {
+      const b = document.createElement('div'); b.className = 'fbadge warn'; b.textContent = '⚠ too small in this PDF'; box.append(b);
+      const fix = document.createElement('button'); fix.type = 'button'; fix.className = 'fixbtn'; fix.textContent = 'Type here instead →';
+      fix.onclick = ev => { ev.stopPropagation(); sendFieldToEditPdf(f); };
+      box.append(fix);
+    }
+    stage.append(box);
+  });
+  if (fillState.focusAfterRender) { const nm = fillState.focusAfterRender; fillState.focusAfterRender = null; focusFieldBox(nm); }
+}
+
+// Called when a field on the page gains focus (a real click, or our own programmatic .focus() below).
+// This must NEVER rebuild the overlay: doing so would remove the very input the person just clicked
+// into (mid-click), which silently drops keyboard focus and makes typing appear to do nothing.
+function handleFieldFocus(name) {
+  fillState.sel = name;
+  $$('.ffield', $('#fillstage')).forEach(b => b.classList.toggle('on', b.dataset.name === name));
+  renderFieldList();
+}
+function focusFieldBox(name) {
+  const box = [...$$('.ffield', $('#fillstage'))].find(b => b.dataset.name === name);
+  if (box) { box.scrollIntoView({ block: 'center', behavior: 'smooth' }); const inp = box.querySelector('input,select,textarea'); if (inp) inp.focus(); }
+}
+// Called when the person picks a field from the list (a deliberate jump, possibly to another page).
+function selectField(name) {
+  fillState.sel = name;
+  const f = (state.fields || []).find(x => x.name === name); if (!f) return;
+  if (f.page !== fillState.page) {
+    fillState.page = f.page;
+    fillState.focusAfterRender = name;   // picked up at the end of the next renderFieldOverlay()
+    showFillPage();                      // triggers img.onload -> renderFieldOverlay()
+  } else {
+    $$('.ffield', $('#fillstage')).forEach(b => b.classList.toggle('on', b.dataset.name === name));
+    renderFieldList();
+    focusFieldBox(name);
+  }
+}
+
+function renderFieldList() {
+  const ul = $('#flist'); ul.replaceChildren();
+  (state.fields || []).forEach(f => {
+    const tag = fieldTag(f);
+    const li = document.createElement('li'); if (fillState.sel === f.name) li.className = 'on';
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.dir = 'auto';
+    const v = fieldValue(f); nm.textContent = f.name + (v && f.type !== 'checkbox' ? ': ' + v : v === true ? ': ✓' : '');
+    const tags = document.createElement('span'); tags.style.display = 'flex'; tags.style.gap = '4px';
+    const pg = document.createElement('span'); pg.className = 'tag pg'; pg.textContent = 'p' + (f.page + 1); tags.append(pg);
+    if (tag.shared) { const t = document.createElement('span'); t.className = 'tag shared'; t.textContent = 'shared'; tags.append(t); }
+    if (tag.broken) { const t = document.createElement('span'); t.className = 'tag warn'; t.textContent = '⚠'; tags.append(t); }
+    li.append(nm, tags); li.onclick = () => selectField(f.name); ul.append(li);
+  });
+}
+
+function sendFieldToEditPdf(f) {
+  const pg = state.pdf.pages[f.page];
+  const w = Math.max(160, f.rect[2] - f.rect[0]), h = Math.max(24, f.rect[3] - f.rect[1]);
+  const x = Math.min(Math.max(f.rect[0], 0), Math.max(0, pg.w - w));
+  const y = Math.min(Math.max(f.rect[1], 0), Math.max(0, pg.h - h));
+  $('nav [data-tab="overlay"]').click();
+  state.page = f.page; showPage();
+  addItem({ kind: 'text', page: f.page, pages: 'this', x, y, w, h, text: '', size: state.lastSize, color: '#000000',
+    align: 'auto', bold: false, shrink: true, font: state.lastFont });
+  setTimeout(() => $('#e-text') && $('#e-text').focus(), 50);
+}
+
+$('#build-fill').onclick = async () => {
+  const values = {};
+  fillState.dirty.forEach(name => { values[name] = fillState.values[name]; });
+  if (!Object.keys(values).length) { $('#fill-result').innerHTML = '<div class="note">Nothing to fill yet — click a field on the page and type.</div>'; return; }
+  const btn = $('#build-fill'); btn.disabled = true;
+  try {
+    const r = await postJSON(`/api/fill/${state.pdf.id}`, { values, flatten: $('#flatten').checked, font: fillFont.value || null, font_size: parseFloat($('#fill-fs').value) || null });
+    await showPdfResult(r, $('#fill-result'), outName('filled'));
+  } finally { btn.disabled = false; }
+};
+
+/* ================= COMPRESS ================= */
+/* ================= COMPRESS ================= */
+const fmtSize = n => n >= 100000 ? (n / 1e6).toFixed(2) + ' MB' : Math.round(n / 1000) + ' KB';
+function updateCompressUI() {
+  const has = !!state.pdf;
+  $('#cmpopts').classList.toggle('hidden', !has);
+  $('#cmpmsg').textContent = has ? `Current size: ${fmtSize(state.pdf.size)}  (${state.pdf.name})` : 'Choose a PDF above.';
+  if (has && !$('#cmp-targetnum').dataset.touched) {
+    // A sensible starting suggestion: a bit under the current size, never below 50 KB.
+    const suggestMb = Math.max(0.05, Math.floor((state.pdf.size / 1e6) * 0.6 * 10) / 10);
+    $('#cmp-targetnum').value = suggestMb;
+  }
+}
+$$('input[name=lvl]').forEach(r => r.onchange = () => $('#cmp-targetrow').classList.toggle('hidden', r.value !== 'target' || !r.checked));
+$('#cmp-targetnum').addEventListener('input', () => { $('#cmp-targetnum').dataset.touched = '1'; });
+$('#build-cmp').onclick = async () => {
+  if (!state.pdf) return;
+  const level = $('input[name=lvl]:checked').value;
+  const body = { level, grayscale: $('#cmp-gray').checked, strip_metadata: $('#cmp-meta').checked };
+  if (level === 'target') {
+    const n = parseFloat($('#cmp-targetnum').value);
+    if (!n || n <= 0) { $('#cmp-result').innerHTML = '<div class="note">Enter a target size greater than 0 first.</div>'; return; }
+    body.target_bytes = Math.round(n * ($('#cmp-targetunit').value === 'MB' ? 1e6 : 1000));
+  }
+  const btn = $('#build-cmp'); btn.disabled = true; btn.textContent = level === 'target' ? 'Finding a fit…' : 'Compressing…';
+  try {
+    const r = await postJSON(`/api/compress/${state.pdf.id}`, body);
+    await showPdfResult(r, $('#cmp-result'), outName('small'));
+  } finally { btn.disabled = false; btn.textContent = 'Compress'; }
+};
+
+/* ================= TEMPLATES ================= */
+let templates = [];
+async function loadTemplates() {
+  templates = (await (await fetch('/api/templates')).json()).templates;
+  const sel = $('#tplsel'); sel.replaceChildren();
+  templates.forEach(t => sel.append(new Option(t.title, t.id)));
+  sel.onchange = renderTplForm; renderTplForm();
+}
+function renderTplForm() {
+  const t = templates.find(x => x.id === $('#tplsel').value), host = $('#tplform'); host.replaceChildren();
+  if (!t) { host.textContent = 'No templates found in the pdf_templates folder.'; return; }
+  t.fields.forEach(f => {
+    const lab = document.createElement('label'); lab.textContent = f.label || f.name;
+    const inp = f.type === 'textarea' ? document.createElement('textarea') : Object.assign(document.createElement('input'), { type: 'text' });
+    inp.dir = 'auto'; inp.dataset.name = f.name; inp.value = f.default || '';
+    if (f.type === 'textarea') inp.style.minHeight = '140px';
+    host.append(lab, inp);
+  });
+}
+$('#build-gen').onclick = async () => {
+  const values = {}; $$('#tplform [data-name]').forEach(i => values[i.dataset.name] = i.value);
+  const id = $('#tplsel').value; if (!id) return;
+  const btn = $('#build-gen'); btn.disabled = true;
+  try {
+    const r = await postJSON(`/api/generate/${id}`, { values, page_numbers: $('#pagenums').checked, font: genFont.value || null });
+    await showPdfResult(r, $('#gen-result'), id + '.pdf');
+  } finally { btn.disabled = false; }
+};
+loadTemplates();
+
+/* ================= FONTS ================= */
+const fontFamilyOf = {};      // font id -> css family name
+const fontCss = id => fontFamilyOf[id] ? `"${fontFamilyOf[id]}", system-ui, sans-serif` : '';
+const SAMPLE = 'ދިވެހިބަސް ސަލާމް';
+const pickers = [];
+const fontStyle = document.head.appendChild(document.createElement('style'));
+
+function mountFontPicker(host) {
+  host.innerHTML = '<label>Font</label><div class="fprow"><select></select><button type="button" class="btn">Add font…</button></div><div class="sample" dir="rtl"></div>';
+  const sel = $('select', host), sample = $('.sample', host);
+  const showSample = () => { sample.textContent = SAMPLE; sample.style.fontFamily = fontCss(sel.value); };
+  sel.addEventListener('change', showSample); sel.addEventListener('sample', showSample);
+  $('button', host).onclick = () => { $('#fontfile')._target = sel; $('#fontfile').click(); };
+  pickers.push({ sel, showSample });
+  return sel;
+}
+function fillPickers(selectId) {
+  const rows = state.fonts.map(f => `<option value="${f.id}">${f.name}${f.source === 'system' ? '  (installed)' : f.source === 'added' ? '  (added)' : ''}</option>`).join('');
+  pickers.forEach(p => { const keep = p.sel.value; p.sel.innerHTML = rows; p.sel.value = (selectId && p.sel === selectId.sel) ? selectId.id : (keep || state.fonts[0].id); if (!p.sel.value) p.sel.value = state.fonts[0].id; p.showSample(); });
+}
+async function loadFonts(refresh) {
+  state.fonts = (await (await fetch('/api/fonts' + (refresh ? '?refresh=1' : ''))).json()).fonts;
+  fontStyle.textContent = state.fonts.map((f, i) => { fontFamilyOf[f.id] = 'dvf' + i; return `@font-face{font-family:"dvf${i}";src:url(/api/fontfile?id=${encodeURIComponent(f.id)});}`; }).join('\n');
+  if (!state.lastFont) state.lastFont = state.fonts[0].id;
+  fillPickers(); drawBoxes();
+}
+$('#fontfile').onchange = async e => {
+  const f = e.target.files[0], target = e.target._target; e.target.value = ''; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/api/fonts', { method: 'POST', body: fd }), j = await r.json();
+  if (!r.ok) { alert(j.error); return; }
+  await loadFonts(true); fillPickers({ sel: target, id: j.font.id }); target.dispatchEvent(new Event('change'));
+};
+E.font = mountFontPicker($('#fp-overlay'));
+const fillFont = mountFontPicker($('#fp-fill')), genFont = mountFontPicker($('#fp-gen'));
+bindEditor();
+loadFonts();
+
+/* ================= HELP & ABOUT ================= */
+$$('[data-help]').forEach(b => b.onclick = () => {
+  $$('[data-help]').forEach(x => x.classList.toggle('on', x === b));
+  const help = b.dataset.help === 'help';
+  $('#help-help').classList.toggle('hidden', !help); $('#help-about').classList.toggle('hidden', help);
+  $('#helpOpenAll').classList.toggle('hidden', !help); $('#helpCloseAll').classList.toggle('hidden', !help);
+});
+$('#helpOpenAll').onclick = () => $$('#help-help details').forEach(d => d.open = true);
+$('#helpCloseAll').onclick = () => $$('#help-help details').forEach(d => d.open = false);
+fetch('/api/about').then(r => r.json()).then(j => {
+  $('#aboutName').textContent = j.name; $('#aboutVersion').textContent = j.version; $('#aboutReleased').textContent = j.released;
+}).catch(() => {});
+
+/* ================= THAANA KEYBOARD ================= */
+let lastField = null;
+document.addEventListener('focusin', e => {
+  if (e.target.matches('textarea, input[type=text]')) lastField = e.target;
+});
+function insertAtCursor(s) {
+  const f = lastField; if (!f) return;
+  f.focus();
+  const a = f.selectionStart ?? f.value.length, b = f.selectionEnd ?? f.value.length;
+  f.setRangeText(s, a, b, 'end');
+  f.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function key(host, ch, label) {
+  const b = document.createElement('button'); b.textContent = label || ch; b.type = 'button';
+  b.onmousedown = e => e.preventDefault();            // keep focus (and cursor) in the text box
+  b.onclick = () => insertAtCursor(ch); host.append(b);
+}
+for (let c = 0x0780; c <= 0x07A5; c++) key($('#kLetters'), String.fromCharCode(c));
+for (let c = 0x07A6; c <= 0x07B0; c++) key($('#kFili'), String.fromCharCode(c), '\u0787' + String.fromCharCode(c));   // shown on an alifu carrier
+key($('#kMisc'), '\u060C', '،'); key($('#kMisc'), '\u061F', '؟'); key($('#kMisc'), '\u061B', '؛'); key($('#kMisc'), ' ', 'space'); key($('#kMisc'), '\n', '↵');
+$('#kbdToggle').onclick = () => $('#kbd').classList.toggle('hidden');
+$('#kbdClose').onclick = () => $('#kbd').classList.add('hidden');
+$('#kbdToggle').onmousedown = e => e.preventDefault();
+</script>
+</body>
+</html>

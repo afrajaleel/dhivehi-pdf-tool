@@ -1,0 +1,11 @@
+[
+  {"name": "APPROVED",     "text": "APPROVED",     "color": "#15803d"},
+  {"name": "REJECTED",     "text": "REJECTED",     "color": "#b91c1c"},
+  {"name": "RECEIVED",     "text": "RECEIVED",     "color": "#1d4ed8"},
+  {"name": "PAID",         "text": "PAID",         "color": "#15803d"},
+  {"name": "CONFIDENTIAL", "text": "CONFIDENTIAL", "color": "#b91c1c"},
+  {"name": "URGENT",       "text": "URGENT",       "color": "#c2410c"},
+  {"name": "FOR REVIEW",   "text": "FOR REVIEW",   "color": "#1d4ed8"},
+  {"name": "DRAFT",        "text": "DRAFT",        "color": "#52525b"},
+  {"name": "COPY",         "text": "COPY",         "color": "#52525b"}
+]

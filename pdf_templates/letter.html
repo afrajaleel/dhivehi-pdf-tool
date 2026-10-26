@@ -1,0 +1,19 @@
+<div style="text-align:center">
+  <h2{{ org|attrs }}>{{ org }}</h2>
+  <p{{ org_address|attrs }}>{{ org_address }}</p>
+</div>
+<hr>
+<p{{ ref_label|attrs }}>{{ ref_label }}: {{ ref }}</p>
+<p{{ date_label|attrs }}>{{ date_label }}: {{ date }}</p>
+<p>&nbsp;</p>
+<p{{ recipient|attrs }}>{{ recipient }}</p>
+<p>&nbsp;</p>
+<p{{ subject_label|attrs }}><b>{{ subject_label }}: {{ subject }}</b></p>
+<p>&nbsp;</p>
+{{ body|paragraphs }}
+<p>&nbsp;</p>
+<p{{ closing|attrs }}>{{ closing }}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p{{ sender|attrs }}>{{ sender }}</p>
+<p{{ sender_title|attrs }}>{{ sender_title }}</p>

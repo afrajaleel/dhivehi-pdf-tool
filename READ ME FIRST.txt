@@ -1,0 +1,124 @@
+﻿╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║                   D H I V E H I   P D F   T O O L                    ║
+║                         ~  READ ME FIRST  ~                          ║
+║                                                                      ║
+║       Write Dhivehi on PDFs  |  Fill forms  |  Sign  |  Stamp        ║
+║                      Make letters  |  Compress                       ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════╗
+║   !!  IMPORTANT  !!                                                  ║
+║                                                                      ║
+║   This program will NOT work if you run it from the OFFICE SERVER    ║
+║   or any shared / network folder.                                    ║
+║                                                                      ║
+║   Copy the WHOLE folder to THIS computer first                       ║
+║   (Desktop or a local drive such as C:\).                            ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+════════════════════════════════════════════════════════════════════════
+  HOW TO INSTALL  (one time, 2 minutes)
+════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────────────────────────────────────────────┐
+│   STEP 1   Copy the whole  DhivehiPDF  folder from the server        │
+│            to your own computer.                                     │
+│                                                                      │
+│            Good places:    Desktop                                   │
+│                            C:\DhivehiPDF                             │
+│                            Documents                                 │
+│                                                                      │
+│            If you received a .zip file, right-click it and choose    │
+│            "Extract All..." first.                                   │
+│            Do NOT run it from inside the zip.                        │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│   STEP 2   Open the folder on YOUR computer.                         │
+│                                                                      │
+│   STEP 3   Double-click:      DhivehiPDF.exe                         │
+│                                                                      │
+│            The tool opens in its own window. That's it!              │
+│            (The first start can take 10-20 seconds. Please wait.)    │
+└──────────────────────────────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════
+  WHAT THE TOOL CAN DO
+════════════════════════════════════════════════════════════════════════
+
+   [1]  EDIT PDF          Type Dhivehi / English on any PDF, add your
+                          signature, add stamps (or your own seal picture)
+   [2]  FILL A FORM       Fill in PDF forms, including in Dhivehi
+   [3]  NEW FROM TEMPLATE Make a new letter from a ready-made template
+   [4]  COMPRESS          Make big PDFs smaller for email / upload
+
+   Your files never leave your computer. Nothing is sent to the internet.
+
+
+════════════════════════════════════════════════════════════════════════
+  GOOD TO KNOW
+════════════════════════════════════════════════════════════════════════
+
+   >>  KEEP THE FOLDER TOGETHER.
+       Do not move DhivehiPDF.exe out of its folder. It needs the other
+       files beside it. To make a shortcut: right-click DhivehiPDF.exe
+       -> Send to -> Desktop (create shortcut).
+
+   >>  WINDOWS SAYS "Windows protected your PC"?
+       This is normal for a new program. Click "More info", then
+       "Run anyway". If it is blocked completely, ask IT to allow
+       the DhivehiPDF folder.
+
+   >>  SAVE YOUR RESULT.
+       After building a PDF, click the Download / Save button and choose
+       where to save it. Your original PDF is never changed.
+
+   >>  YOUR SIGNATURE AND STAMP PICTURES are remembered on this computer
+       only. On another computer you add them again.
+
+   >>  YOU CAN EDIT (no need to rebuild anything):
+         pdf_templates\   your letter templates
+         stamps.json      the list of stamp names and colours
+         fonts\           add extra Dhivehi fonts (or use the
+                          "Add font..." button inside the tool)
+
+
+════════════════════════════════════════════════════════════════════════
+  IF SOMETHING GOES WRONG
+════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────────────────────────────────────────────┐
+│   Nothing happens / it closes at once                                │
+│      -> Make sure the folder is on your computer, not the server.    │
+│                                                                      │
+│   The window is blank or opens in your web browser instead           │
+│      -> That is fine. Keep the small message box open while          │
+│         you work; click OK on it when finished to close the tool.    │
+│                                                                      │
+│   "This PDF is password-protected"                                   │
+│      -> Remove the password in another program first.                │
+│                                                                      │
+│   Dhivehi letters look wrong or show as empty boxes                  │
+│      -> Use the Font menu and pick a Thaana font.                    │
+│                                                                      │
+│   Still stuck?  Ask the person who gave you this folder.             │
+└──────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║                            Quick summary                             ║
+║                                                                      ║
+║              1. Copy the WHOLE folder to your computer               ║
+║                          2. Open the folder                          ║
+║                    3. Double-click DhivehiPDF.exe                    ║
+║                                                                      ║
+║                     NOT from the office server!                      ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+

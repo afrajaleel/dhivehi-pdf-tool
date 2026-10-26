@@ -1,0 +1,19 @@
+{
+  "title": "Official letter",
+  "page": {"size": "a4", "margins": [64, 56, 64, 56]},
+  "fields": [
+    {"name": "org", "label": "Organisation", "type": "text"},
+    {"name": "org_address", "label": "Address / contact line", "type": "text"},
+    {"name": "ref_label", "label": "Reference label", "type": "text", "default": "ނަންބަރު"},
+    {"name": "ref", "label": "Reference number", "type": "text"},
+    {"name": "date_label", "label": "Date label", "type": "text", "default": "ތާރީޚް"},
+    {"name": "date", "label": "Date", "type": "text"},
+    {"name": "recipient", "label": "To", "type": "text"},
+    {"name": "subject_label", "label": "Subject label", "type": "text", "default": "މައުޟޫއު"},
+    {"name": "subject", "label": "Subject", "type": "text"},
+    {"name": "body", "label": "Body (one paragraph per line)", "type": "textarea"},
+    {"name": "closing", "label": "Closing", "type": "text", "default": "ޝުކުރިއްޔާ"},
+    {"name": "sender", "label": "Sender name", "type": "text"},
+    {"name": "sender_title", "label": "Sender title", "type": "text"}
+  ]
+}
